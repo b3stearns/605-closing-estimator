@@ -1003,7 +1003,6 @@ function renderDeal(){
         ${d.assessOn ? `<div class="line"><span>Assessments:</span><span>${money(num(d.assessments))}</span></div>` : ""}
         ${d.hoaOn ? `<div class="line"><span>HOA:</span><span>${money(hoaProration(num(d.hoaMonthly), d.closeDate).seller)}</span></div>` : ""}
         ${d.propaneOn ? `<div class="line"><span>Fuel / propane:</span><span>${money(num(d.propane))}</span></div>` : ""}
-        <div class="line"><span>Closing / Possession (${d.closeSellerPct==null?50:d.closeSellerPct}%):</span><span>${money(s.closeShare)}</span></div>
         <div class="line"><span>Other:</span><span>${money(d.other)}</span></div>
         ${(d.extras||[]).filter(x=>x.who==="seller"||x.who==="split").map(x=>`<div class="line"><span>${x.label||"Custom"}${x.who==="split"?" (split)":""}</span><span>${money(num(x.amount)*(x.who==="split"?0.5:1))}</span></div>`).join("")}
       </div>
