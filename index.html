@@ -1277,14 +1277,8 @@ async function loadScript(src, flag){
 async function letterImage(){
   const sheet = document.getElementById("statement-sheet");
   await loadScript("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js", "html2canvas");
-  const clone = sheet.cloneNode(true);
-  const stage = document.createElement("div");
-  stage.style.cssText = "position:fixed;left:-2000px;top:0;width:760px;background:#fff;padding:18px 22px;font-size:11px;line-height:1.25;color:#020202";
-  stage.appendChild(clone);
-  document.body.appendChild(stage);
-  const shot = await html2canvas(stage, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-  document.body.removeChild(stage);
-  const pageW = 1275, pageH = 1650, margin = 48;
+  const shot = await html2canvas(sheet, { scale: 1.5, backgroundColor: "#ffffff", useCORS: true, logging: false });
+  const pageW = 816, pageH = 1056, margin = 32;
   const page = document.createElement("canvas");
   page.width = pageW; page.height = pageH;
   const ctx = page.getContext("2d");
@@ -1292,8 +1286,7 @@ async function letterImage(){
   ctx.fillRect(0, 0, pageW, pageH);
   const maxW = pageW - margin * 2, maxH = pageH - margin * 2;
   const scale = Math.min(maxW / shot.width, maxH / shot.height);
-  const dw = shot.width * scale, dh = shot.height * scale;
-  ctx.drawImage(shot, (pageW - dw) / 2, margin, dw, dh);
+  ctx.drawImage(shot, (pageW - shot.width * scale) / 2, margin, shot.width * scale, shot.height * scale);
   return page;
 }
 async function shareSheet(mode){
@@ -1316,7 +1309,9 @@ async function shareSheet(mode){
       blob = pdf.output("blob");
       name = "605-estimate.pdf"; type = "application/pdf";
     } else {
-      blob = await new Promise(r => page.toBlob(r, "image/jpeg", 0.92));
+      const data = page.toDataURL("image/jpeg", 0.9);
+      const res = await fetch(data);
+      blob = await res.blob();
       name = "605-estimate.jpg"; type = "image/jpeg";
     }
     const file = new File([blob], name, { type });
@@ -1334,7 +1329,7 @@ async function shareSheet(mode){
       menu.innerHTML = '<button class="btn btn-secondary" onclick="shareSheet(\'pdf\')">Share PDF</button><button class="btn btn-secondary" onclick="shareSheet(\'jpg\')">JPG</button><button class="btn btn-secondary" onclick="shareSheet(\'print\')">Print</button>';
     }
   } catch(e) {
-    menu.innerHTML = '<button class="btn btn-secondary" onclick="toggleShare()">Could not build file. Try again.</button>';
+    menu.innerHTML = '<button class="btn btn-secondary" onclick="toggleShare()">Could not build file. ' + (e && e.message ? e.message : "Try again.") + '</button>';
   }
 }
 document.querySelectorAll(".brand-logo").forEach(img => { img.src = LOGO; });
