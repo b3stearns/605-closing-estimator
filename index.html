@@ -795,6 +795,11 @@ function renderDeal(){
     </fieldset>
     <fieldset><legend>Funding & concessions</legend>
       <div class="two">
+        <div class="field"><label>Offer loan type</label>
+          <select onchange="patchDeal('${d.id}','loanType',this.value)">
+            ${[["conventional","Conventional"],["fha","FHA"],["va","VA"],["sdhda","SDHDA"],["cash","Cash"]].map(([v,l])=>`<option value="${v}" ${(d.loanType||"conventional")===v?"selected":""}>${l}</option>`).join("")}
+          </select>
+        </div>
         <div class="field"><label>Mortgage payoff</label><input type="number" value="${d.payoff}" onchange="patchDeal('${d.id}','payoff',this.value)"></div>
         <div class="field"><label>Seller concessions</label><input type="number" value="${d.concessions}" onchange="patchDeal('${d.id}','concessions',this.value)"></div>
         <div class="field"><label>Seller financing concessions</label>
@@ -926,7 +931,7 @@ function renderDeal(){
       </div>
       <div class="ns-addr">${d.address || "Property address"}<br>${COUNTIES[d.county].name} County</div>
     </div>
-    <div class="ns-banner">SELLER'S NET SHEET<br>CONVENTIONAL</div>
+    <div class="ns-banner">SELLER'S NET SHEET<br>${({conventional:"CONVENTIONAL",fha:"FHA",va:"VA",sdhda:"SDHDA",cash:"CASH"})[d.loanType||"conventional"]}</div>
     <div class="ns-sum">
       <div>
         <div class="line"><span>Sales Price:</span><span>${money(s.price)}</span></div>
@@ -970,7 +975,7 @@ function renderDeal(){
       </div>
     </div>
     <div class="ns-total">TOTAL CLOSING COSTS<span class="big">${money(closing)}</span></div>
-    <div class="muted" style="margin-top:8px">Estimated closing date: ${d.closeDate || d.updated} · taxes prorated Jan 1 through close</div>
+    <div class="muted" style="margin-top:8px">Estimated closing date: ${d.closeDate || d.updated} · taxes prorated Jan 1 through close · offer: ${({conventional:"Conventional",fha:"FHA",va:"VA",sdhda:"SDHDA",cash:"Cash"})[d.loanType||"conventional"]}</div>
     <p class="footer note">Estimate only, based on the price and close date above. Figures vary with the title company, lender, and tax authority. 605 Real Estate and the agent do not guarantee these numbers. Confirm with the title company and lender before closing.</p>
     <div class="ns-sign"><div>SIGN(X)</div><div>SIGN(Y)</div></div>
     <div class="ns-foot">
