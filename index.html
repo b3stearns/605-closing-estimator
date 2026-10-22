@@ -473,7 +473,18 @@ function buyerClose(d){
   const rate = d.rate == null ? 6.75 : num(d.rate);
   const term = d.term == null ? 30 : num(d.term);
   const annualIns = d.annualIns == null ? 1800 : num(d.annualIns);
-  const prepaidInt = cash ? 0 : Math.round(loan * rate / 100 / 365 * 15);
+  const downPctActual = price ? (down / price) * 100 : 0;
+  let programFee = 0, programLabel = "";
+  if(type === "fha" && loan > 0){
+    programFee = Math.round(loan * 0.0175);
+    programLabel = "FHA upfront MIP (1.75%, financed)";
+  } else if(type === "va" && loan > 0){
+    const vaPct = downPctActual >= 10 ? 1.25 : downPctActual >= 5 ? 1.5 : 2.15;
+    programFee = Math.round(loan * vaPct / 100);
+    programLabel = `VA funding fee (${vaPct}%, first use, financed)`;
+  }
+  const loanWithFee = loan + programFee;
+  const prepaidInt = cash ? 0 : Math.round(loanWithFee * rate / 100 / 365 * 15);
   const escrowTax = cash ? 0 : Math.round(num(d.annualTax) / 12 * 2);
   const escrowIns = cash ? 0 : Math.round(annualIns / 12 * 2);
   const inspection = 450;
@@ -490,12 +501,12 @@ function buyerClose(d){
   const warrantyBuyer = warrantyCost - Math.round(warrantyCost * num(d.warrantySellerPct == null ? 0 : d.warrantySellerPct) / 100);
   const hoa = d.hoaOn ? hoaProration(num(d.hoaMonthly), d.closeDate).buyer : 0;
   const costs = title+closeShare+orig+appraisal+inspection+prepaids+surveyBuyer+floodBuyer+warrantyBuyer+hoa+num(d.other)+extraBuyer;
-  const pi = loan > 0 ? monthlyPI(loan, rate, term) : 0;
+  const pi = loanWithFee > 0 ? monthlyPI(loanWithFee, rate, term) : 0;
   const taxMo = num(d.annualTax) / 12;
   const insMo = annualIns / 12;
-  const pmi = cash ? 0 : num(d.pmi);
+  const pmi = cash ? 0 : (type === "fha" && !num(d.pmi) ? Math.round(loan * 0.0055 / 12) : num(d.pmi));
   const piti = pi + taxMo + insMo + pmi;
-  return { price, loan, down, title, search, settle, wire, deed, record, closeShare, prepaids, prepaidInt, escrowTax, escrowIns, inspection, costs, bring: down + costs - num(d.earnest) - sellerCredit, rate, term, pi, taxMo, insMo, pmi, piti, type, extraBuyer, sellerCredit, surveyBuyer, floodBuyer, warrantyBuyer };
+  return { price, loan, loanWithFee, programFee, programLabel, down, title, search, settle, wire, deed, record, closeShare, prepaids, prepaidInt, escrowTax, escrowIns, inspection, costs, bring: down + costs - num(d.earnest) - sellerCredit, rate, term, pi, taxMo, insMo, pmi, piti, type, cash, extraBuyer, sellerCredit, surveyBuyer, floodBuyer, warrantyBuyer };
 }
 
 function blankDeal(party){
@@ -854,10 +865,11 @@ function renderDeal(){
               ? `<input type="number" value="${d.downAmount==null?60000:d.downAmount}" ${(d.loanType||"conventional")==="cash"?"disabled":""} onchange="patchDeal('${d.id}','downAmount',this.value)">`
               : `<input type="number" step="0.5" value="${d.downPct==null?20:d.downPct}" ${(d.loanType||"conventional")==="cash"?"disabled":""} onchange="patchDeal('${d.id}','downPct',this.value)">`}
           </div>
-          <div class="muted" style="margin-top:4px">Down ${money(s.down)} · Loan ${money(s.loan)}</div>
+          <div class="muted" style="margin-top:4px">Down ${money(s.down)} · Loan ${money(s.loan)}${s.programFee ? ` + ${money(s.programFee)} financed` : ""}</div>
         </div>
+        ${(d.loanType||"conventional")==="cash" ? "" : `
         <div class="field"><label>Interest rate %</label><input type="number" step="0.125" value="${d.rate==null?6.75:d.rate}" onchange="patchDeal('${d.id}','rate',this.value)"></div>
-        <div class="field"><label>Term (years)</label><input type="number" value="${d.term==null?30:d.term}" onchange="patchDeal('${d.id}','term',this.value)"></div>
+        <div class="field"><label>Term (years)</label><input type="number" value="${d.term==null?30:d.term}" onchange="patchDeal('${d.id}','term',this.value)"></div>`}
         <div class="field"><label>Seller concessions</label>
           <div style="display:flex;gap:8px">
             <select style="width:84px;flex:0 0 84px" onchange="patchDeal('${d.id}','sfMode',this.value)">
@@ -871,12 +883,14 @@ function renderDeal(){
         </div>
       </div>
     </fieldset>
+    ${(d.loanType||"conventional")==="cash" ? "" : `
     <fieldset><legend>Monthly payment (PITI)</legend>
       <div class="two">
         <div class="field"><label>Annual property taxes</label><input type="number" value="${d.annualTax}" onchange="patchDeal('${d.id}','annualTax',this.value)"></div>
         <div class="field"><label>Annual homeowners insurance</label><input type="number" value="${d.annualIns==null?1800:d.annualIns}" onchange="patchDeal('${d.id}','annualIns',this.value)"></div>
-        <div class="field"><label>Monthly PMI (0 if none)</label><input type="number" step="0.01" value="${d.pmi==null?0:d.pmi}" onchange="patchDeal('${d.id}','pmi',this.value)"></div>
+        <div class="field"><label>${(d.loanType)==="fha"?"Monthly MIP":"Monthly PMI (0 if none)"}</label><input type="number" step="0.01" value="${d.pmi==null?0:d.pmi}" onchange="patchDeal('${d.id}','pmi',this.value)"></div>
       </div>
+      ${s.programFee ? `<p class="muted" style="margin:8px 0 0">${s.programLabel}: ${money(s.programFee)}. Added to the loan, not cash to close.</p>` : ""}
     </fieldset>
     <fieldset><legend>Loan</legend>
       <div class="two">
@@ -894,7 +908,8 @@ function renderDeal(){
       <div class="line"><span>Wire / handling</span><span>${money(s.wire)}</span></div>
       <div class="line"><span>Attorney doc prep</span><span>${money(s.deed)}</span></div>
       <div class="line"><span>Recording</span><span>${money(s.record)}</span></div>
-    </fieldset>`;
+    </fieldset>`}
+`;
 
   const contractItems = d.party === "seller" ? `
     <fieldset><legend>Contract items</legend>
@@ -1030,17 +1045,18 @@ function renderDeal(){
       <div>
         <div class="line"><span>House Price:</span><span>${money(s.price)}</span></div>
         <div class="line"><span>Down Payment:</span><span>${money(s.down)}</span></div>
-        <div class="line"><span>${s.term}-Year Loan at ${s.rate}%:</span><span>${money(s.loan)}</span></div>
+        ${s.cash ? `<div class="line"><span>Cash purchase</span><span>${money(s.price)}</span></div>` : `<div class="line"><span>${s.term}-Year Loan at ${s.rate}%:</span><span>${money(s.loanWithFee)}</span></div>`}
+        ${s.programFee ? `<div class="line"><span>${s.programLabel}:</span><span>${money(s.programFee)}</span></div>` : ""}
         <div class="line"><span>Closing Costs:</span><span>${money(s.costs)}</span></div>
       </div>
-      ${donutChart([
+      ${s.cash ? "" : donutChart([
         { label: "Principal & interest", value: s.pi, color: "#b71538" },
         { label: "Property tax", value: s.taxMo, color: "#2a2a2a" },
         { label: "Homeowners insurance", value: s.insMo, color: "#8a8a8a" },
-        { label: "PMI", value: s.pmi, color: "#c9a227" }
+        { label: s.type==="fha" ? "MIP" : "PMI", value: s.pmi, color: "#c9a227" }
       ], "Monthly", money(s.piti))}
     </div>
-    <div class="ns-net">MONTHLY PAYMENT<span class="big">${money(s.piti)}</span></div>
+    ${s.cash ? "" : `<div class="ns-net">MONTHLY PAYMENT<span class="big">${money(s.piti)}</span></div>`}
     <div class="ns-banner">BRING TO CLOSE</div>
     <div class="ns-cols">
       <div>
@@ -1050,8 +1066,8 @@ function renderDeal(){
       </div>
       <div>
         <div class="kicker">LOAN & PREPAIDS</div>
-        <div class="line"><span>Origination:</span><span>${money(d.origination)}</span></div>
-        <div class="line"><span>Appraisal:</span><span>${money(d.appraisal)}</span></div>
+        ${s.cash ? "" : `<div class="line"><span>Origination:</span><span>${money(d.origination)}</span></div>`}
+        ${s.cash ? "" : `<div class="line"><span>Appraisal:</span><span>${money(d.appraisal)}</span></div>`}
         <div class="line"><span>Inspection:</span><span>${money(s.inspection)}</span></div>
         <div class="line"><span>Prepaids & Escrow:</span><span>${money(s.prepaids)}</span></div>
         <div class="line"><span>Survey:</span><span>${money(s.surveyBuyer)}</span></div>
@@ -1327,13 +1343,13 @@ async function shareSheet(mode){
     if(isPhone && navigator.share){
       menu.innerHTML = `<button class="btn btn-primary" id="shareNow">Share ${mode === "pdf" ? "PDF" : "image"}</button><button class="btn btn-secondary" onclick="resetShareMenu()">Back</button>`;
       document.getElementById("shareNow").onclick = async () => {
-        try { await navigator.share({ files: [file], title: "605 Estimate" }); menu.classList.add("hidden"); }
+        try { await navigator.share({ files: [file], title: "605 Estimate" }); menu.innerHTML = '<p class="muted">Sent. This sheet stays on this phone.</p>'; }
         catch(e){ if(!e || e.name !== "AbortError") window.open(url); }
       };
     } else {
       const a = document.createElement("a");
       a.href = url; a.download = name; a.click();
-      resetShareMenu();
+      menu.innerHTML = '<p class="muted">Saved. This sheet stays on this phone.</p>';
     }
   } catch(e) {
     menu.innerHTML = '<button class="btn btn-secondary" onclick="resetShareMenu()">Could not build file. ' + (e && e.message ? e.message : "Try again.") + '</button>';
