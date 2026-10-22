@@ -1302,6 +1302,9 @@ async function shareSheet(mode){
   if(!sheet) return;
   if(mode === "print"){ window.print(); return; }
   const isPhone = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  const menu = document.getElementById("shareMenu");
+  menu.classList.remove("hidden");
+  menu.innerHTML = '<button class="btn btn-secondary" disabled>Preparing…</button>';
   try {
     const page = await letterImage();
     let blob, name, type;
@@ -1317,16 +1320,21 @@ async function shareSheet(mode){
       name = "605-estimate.jpg"; type = "image/jpeg";
     }
     const file = new File([blob], name, { type });
-    const canShare = navigator.share && navigator.canShare && navigator.canShare({ files: [file] });
-    // PDF on a phone always opens the share sheet. JPG shares on a phone and downloads on a computer.
-    if(isPhone && canShare){
-      await navigator.share({ files: [file], title: "605 Estimate" });
-      return;
+    const url = URL.createObjectURL(blob);
+    if(isPhone && navigator.share){
+      menu.innerHTML = `<button class="btn btn-primary" id="shareNow">Share ${mode.toUpperCase()}</button><a class="btn btn-secondary" href="${url}" download="${name}">Save</a>`;
+      document.getElementById("shareNow").onclick = async () => {
+        try { await navigator.share({ files: [file], title: "605 Estimate" }); }
+        catch(e){ if(!e || e.name !== "AbortError") window.open(url); }
+      };
+    } else {
+      const a = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+      menu.classList.add("hidden");
+      menu.innerHTML = '<button class="btn btn-secondary" onclick="shareSheet(\'pdf\')">Share PDF</button><button class="btn btn-secondary" onclick="shareSheet(\'jpg\')">JPG</button><button class="btn btn-secondary" onclick="shareSheet(\'print\')">Print</button>';
     }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = name; a.click();
   } catch(e) {
-    if(e && e.name === "AbortError") return;
+    menu.innerHTML = '<button class="btn btn-secondary" onclick="toggleShare()">Could not build file. Try again.</button>';
   }
 }
 document.querySelectorAll(".brand-logo").forEach(img => { img.src = LOGO; });
