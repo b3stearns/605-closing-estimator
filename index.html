@@ -374,8 +374,7 @@ function sellerNet(d){
   const sellerCredit = d.sfMode === "pct" ? Math.round(price * num(d.sellerFinancingPct) / 100) : num(d.sellerFinancing);
   const surveyCost = d.surveyOn ? (d.surveyType === "staked" ? 650 : 200) : 0;
   const surveySeller = Math.round(surveyCost * num(d.surveySellerPct == null ? 0 : d.surveySellerPct) / 100);
-  const floodCost = d.floodOn ? 20 : 0;
-  const floodSeller = Math.round(floodCost * num(d.floodSellerPct == null ? 0 : d.floodSellerPct) / 100);
+  const floodSeller = 0;
   const warrantyCost = d.warrantyOn ? num(d.warranty) : 0;
   const warrantySeller = Math.round(warrantyCost * num(d.warrantySellerPct == null ? 0 : d.warrantySellerPct) / 100);
   const assessments = d.assessOn ? num(d.assessments) : 0;
@@ -486,8 +485,7 @@ function buyerClose(d){
   const sellerCredit = d.sfMode === "pct" ? Math.round(price * num(d.sellerFinancingPct) / 100) : num(d.sellerFinancing);
   const surveyCost = d.surveyType === "staked" ? 650 : (d.surveyType === "none" ? 0 : 200);
   const surveyBuyer = surveyCost - Math.round(surveyCost * num(d.surveySellerPct == null ? 0 : d.surveySellerPct) / 100);
-  const floodCost = d.flood ? 20 : 0;
-  const floodBuyer = floodCost - Math.round(floodCost * num(d.floodSellerPct == null ? 0 : d.floodSellerPct) / 100);
+  const floodBuyer = 20;
   const warrantyCost = d.warrantyOn ? num(d.warranty) : 0;
   const warrantyBuyer = warrantyCost - Math.round(warrantyCost * num(d.warrantySellerPct == null ? 0 : d.warrantySellerPct) / 100);
   const hoa = d.hoaOn ? hoaProration(num(d.hoaMonthly), d.closeDate).buyer : 0;
@@ -911,10 +909,6 @@ function renderDeal(){
             </select>
           </div>
           <div class="field"><label>Survey seller %</label><input type="number" value="${d.surveySellerPct==null?0:d.surveySellerPct}" onchange="patchDeal('${d.id}','surveySellerPct',this.value)"></div>` : ""}
-        <div class="field"><label>Flood cert</label>
-          <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.floodOn?"checked":""} onchange="patchDeal('${d.id}','floodOn',this.checked)"> Include flood cert ($20)</label>
-        </div>
-        ${d.floodOn ? `<div class="field"><label>Flood cert seller %</label><input type="number" value="${d.floodSellerPct==null?0:d.floodSellerPct}" onchange="patchDeal('${d.id}','floodSellerPct',this.value)"></div>` : ""}
         <div class="field"><label>Home warranty</label>
           <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.warrantyOn?"checked":""} onchange="patchDeal('${d.id}','warrantyOn',this.checked)"> Include home warranty</label>
         </div>
@@ -943,8 +937,6 @@ function renderDeal(){
           </select>
         </div>
         <div class="field"><label>Survey seller %</label><input type="number" value="${d.surveySellerPct==null?0:d.surveySellerPct}" onchange="patchDeal('${d.id}','surveySellerPct',this.value)"></div>
-        <div class="field"><label>Flood cert ($20)</label><input type="number" value="20" disabled></div>
-        <div class="field"><label>Flood cert seller %</label><input type="number" value="${d.floodSellerPct==null?0:d.floodSellerPct}" onchange="patchDeal('${d.id}','floodSellerPct',this.value)"></div>
         <div class="field"><label>HOA</label>
           <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.hoaOn?"checked":""} onchange="patchDeal('${d.id}','hoaOn',this.checked)"> Prorate monthly HOA</label>
         </div>
@@ -1007,7 +999,6 @@ function renderDeal(){
         <div class="line"><span>Realtor Admin Fee:</span><span>${money(d.admin)}</span></div>
         <div class="line"><span>Seller concessions:</span><span>${money(s.sellerCredit)}</span></div>
         ${d.surveyOn ? `<div class="line"><span>Survey:</span><span>${money(s.surveySeller)}</span></div>` : ""}
-        ${d.floodOn ? `<div class="line"><span>Flood cert:</span><span>${money(s.floodSeller)}</span></div>` : ""}
         ${d.warrantyOn ? `<div class="line"><span>Home warranty:</span><span>${money(s.warrantySeller)}</span></div>` : ""}
         ${d.assessOn ? `<div class="line"><span>Assessments:</span><span>${money(num(d.assessments))}</span></div>` : ""}
         ${d.hoaOn ? `<div class="line"><span>HOA:</span><span>${money(hoaProration(num(d.hoaMonthly), d.closeDate).seller)}</span></div>` : ""}
@@ -1065,7 +1056,7 @@ function renderDeal(){
         <div class="line"><span>Inspection:</span><span>${money(s.inspection)}</span></div>
         <div class="line"><span>Prepaids & Escrow:</span><span>${money(s.prepaids)}</span></div>
         <div class="line"><span>Survey:</span><span>${money(s.surveyBuyer)}</span></div>
-        <div class="line"><span>Flood cert:</span><span>${money(s.floodBuyer)}</span></div>
+        <div class="line"><span>Flood cert:</span><span>$20.00</span></div>
         ${d.warrantyOn ? `<div class="line"><span>Home warranty:</span><span>${money(s.warrantyBuyer)}</span></div>` : ""}
         ${d.hoaOn ? `<div class="line"><span>HOA:</span><span>${money(hoaProration(num(d.hoaMonthly), d.closeDate).buyer)}</span></div>` : ""}
         ${d.propaneOn ? `<div class="line"><span>Fuel / propane:</span><span>${money(num(d.propane))}</span></div>` : ""}
