@@ -1095,7 +1095,7 @@ function renderDeal(){
       <div class="no-print share-bar">
         <button class="btn btn-primary" onclick="toggleShare()">Share / Print</button>
         <div id="shareMenu" class="share-menu hidden">
-          <button class="btn btn-secondary" onclick="shareSheet('pdf')">PDF</button>
+          <button class="btn btn-secondary" onclick="shareSheet('pdf')">Share PDF</button>
           <button class="btn btn-secondary" onclick="shareSheet('jpg')">JPG</button>
           <button class="btn btn-secondary" onclick="shareSheet('print')">Print</button>
         </div>
@@ -1299,8 +1299,9 @@ async function letterImage(){
 async function shareSheet(mode){
   document.getElementById("shareMenu")?.classList.add("hidden");
   const sheet = document.getElementById("statement-sheet");
-  if(!sheet){ window.print(); return; }
+  if(!sheet) return;
   if(mode === "print"){ window.print(); return; }
+  const isPhone = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
   try {
     const page = await letterImage();
     let blob, name, type;
@@ -1308,8 +1309,7 @@ async function shareSheet(mode){
       await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js", "jspdf");
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ unit: "pt", format: "letter" });
-      const img = page.toDataURL("image/jpeg", 0.92);
-      pdf.addImage(img, "JPEG", 0, 0, 612, 792);
+      pdf.addImage(page.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 612, 792);
       blob = pdf.output("blob");
       name = "605-estimate.pdf"; type = "application/pdf";
     } else {
@@ -1317,7 +1317,9 @@ async function shareSheet(mode){
       name = "605-estimate.jpg"; type = "image/jpeg";
     }
     const file = new File([blob], name, { type });
-    if(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
+    const canShare = navigator.share && navigator.canShare && navigator.canShare({ files: [file] });
+    // PDF on a phone always opens the share sheet. JPG shares on a phone and downloads on a computer.
+    if(isPhone && canShare){
       await navigator.share({ files: [file], title: "605 Estimate" });
       return;
     }
@@ -1325,7 +1327,6 @@ async function shareSheet(mode){
     a.href = URL.createObjectURL(blob); a.download = name; a.click();
   } catch(e) {
     if(e && e.name === "AbortError") return;
-    window.print();
   }
 }
 document.querySelectorAll(".brand-logo").forEach(img => { img.src = LOGO; });
