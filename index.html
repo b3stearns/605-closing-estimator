@@ -1303,55 +1303,40 @@ async function letterImage(){
   ctx.drawImage(shot, (pageW - shot.width * scale) / 2, margin, shot.width * scale, shot.height * scale);
   return page;
 }
-async function shareSheet(mode){
+async function shareSheet(){
   const menu = document.getElementById("shareMenu");
   const sheet = document.getElementById("statement-sheet");
   if(!sheet) return;
-  if(mode === "print"){ menu.classList.add("hidden"); window.print(); return; }
+  const isPhone = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
   menu.classList.remove("hidden");
   menu.innerHTML = '<button class="btn btn-secondary" disabled>Preparing…</button>';
   try {
     const page = await letterImage();
-    const wantPdf = mode === "text" || mode === "email";
-    let blob, name, type;
-    if(wantPdf){
-      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js", "jspdf");
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ unit: "pt", format: "letter" });
-      pdf.addImage(page.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 612, 792);
-      blob = pdf.output("blob");
-      name = "605-estimate.pdf"; type = "application/pdf";
-    } else {
-      const data = page.toDataURL("image/jpeg", 0.9);
-      blob = await (await fetch(data)).blob();
-      name = "605-estimate.jpg"; type = "image/jpeg";
-    }
-    const file = new File([blob], name, { type });
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js", "jspdf");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "pt", format: "letter" });
+    pdf.addImage(page.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 612, 792);
+    const blob = pdf.output("blob");
+    const file = new File([blob], "605-estimate.pdf", { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
-    if(mode === "save"){
-      const a = document.createElement("a");
-      a.href = url; a.download = name; a.click();
-      resetShareMenu();
-      return;
-    }
-    const label = mode === "text" ? "Open Messages" : mode === "email" ? "Open Mail" : "Share image";
-    menu.innerHTML = `<button class="btn btn-primary" id="shareNow">${label}</button><button class="btn btn-secondary" onclick="resetShareMenu()">Cancel</button>`;
-    document.getElementById("shareNow").onclick = async () => {
-      try {
-        if(navigator.share) await navigator.share({ files: [file], title: "605 Estimate", text: "605 closing estimate" });
-        else window.open(url);
-      } catch(e) {
-        if(!e || e.name !== "AbortError") window.open(url);
-      }
+    const openShare = async () => {
+      if(navigator.share) await navigator.share({ files: [file], title: "605 Estimate", text: "605 closing estimate" });
+      else window.open(url);
     };
+    if(isPhone && navigator.share){
+      menu.innerHTML = '<button class="btn btn-primary" id="shareNow">Share</button><button class="btn btn-secondary" onclick="window.print()">Print</button>';
+      document.getElementById("shareNow").onclick = async () => {
+        try { await openShare(); menu.classList.add("hidden"); }
+        catch(e){ if(!e || e.name !== "AbortError") window.open(url); }
+      };
+    } else {
+      const a = document.createElement("a");
+      a.href = url; a.download = "605-estimate.pdf"; a.click();
+      menu.classList.add("hidden");
+    }
   } catch(e) {
-    menu.innerHTML = '<button class="btn btn-secondary" onclick="resetShareMenu()">Could not build file. ' + (e && e.message ? e.message : "Try again.") + '</button>';
+    menu.innerHTML = '<button class="btn btn-secondary" onclick="document.getElementById(\'shareMenu\').classList.add(\'hidden\')">Could not build file. ' + (e && e.message ? e.message : "Try again.") + '</button>';
   }
-}
-function resetShareMenu(){
-  const menu = document.getElementById("shareMenu");
-  menu.classList.add("hidden");
-  menu.innerHTML = '<button class="btn btn-secondary" onclick="shareSheet(\'text\')">Text PDF</button><button class="btn btn-secondary" onclick="shareSheet(\'image\')">Share image</button><button class="btn btn-secondary" onclick="shareSheet(\'save\')">Save image</button><button class="btn btn-secondary" onclick="shareSheet(\'email\')">Email</button><button class="btn btn-secondary" onclick="shareSheet(\'print\')">Print</button>';
 }
 document.querySelectorAll(".brand-logo").forEach(img => { img.src = LOGO; });
 </script>
