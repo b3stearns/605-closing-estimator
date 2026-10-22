@@ -1276,7 +1276,7 @@ async function loadScript(src, flag){
 }
 async function letterImage(){
   const sheet = document.getElementById("statement-sheet");
-  await loadScript("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js", "html2canvas");
+  await loadScript("https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.11/dist/html2canvas-pro.min.js", "html2canvas");
   const shot = await html2canvas(sheet, { scale: 1.5, backgroundColor: "#ffffff", useCORS: true, logging: false });
   const pageW = 816, pageH = 1056, margin = 32;
   const page = document.createElement("canvas");
