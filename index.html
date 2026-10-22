@@ -1094,8 +1094,10 @@ function renderDeal(){
       <div class="no-print share-bar">
         <button class="btn btn-primary" onclick="toggleShare()">Share / Print</button>
         <div id="shareMenu" class="share-menu hidden">
-          <button class="btn btn-secondary" onclick="shareSheet('pdf')">Share PDF</button>
-          <button class="btn btn-secondary" onclick="shareSheet('jpg')">JPG</button>
+          <button class="btn btn-secondary" onclick="shareSheet('text')">Text PDF</button>
+          <button class="btn btn-secondary" onclick="shareSheet('image')">Share image</button>
+          <button class="btn btn-secondary" onclick="shareSheet('save')">Save image</button>
+          <button class="btn btn-secondary" onclick="shareSheet('email')">Email</button>
           <button class="btn btn-secondary" onclick="shareSheet('print')">Print</button>
         </div>
       </div>
@@ -1302,18 +1304,17 @@ async function letterImage(){
   return page;
 }
 async function shareSheet(mode){
-  document.getElementById("shareMenu")?.classList.add("hidden");
+  const menu = document.getElementById("shareMenu");
   const sheet = document.getElementById("statement-sheet");
   if(!sheet) return;
-  if(mode === "print"){ window.print(); return; }
-  const isPhone = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-  const menu = document.getElementById("shareMenu");
+  if(mode === "print"){ menu.classList.add("hidden"); window.print(); return; }
   menu.classList.remove("hidden");
   menu.innerHTML = '<button class="btn btn-secondary" disabled>Preparing…</button>';
   try {
     const page = await letterImage();
+    const wantPdf = mode === "text" || mode === "email";
     let blob, name, type;
-    if(mode === "pdf"){
+    if(wantPdf){
       await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js", "jspdf");
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ unit: "pt", format: "letter" });
@@ -1322,27 +1323,35 @@ async function shareSheet(mode){
       name = "605-estimate.pdf"; type = "application/pdf";
     } else {
       const data = page.toDataURL("image/jpeg", 0.9);
-      const res = await fetch(data);
-      blob = await res.blob();
+      blob = await (await fetch(data)).blob();
       name = "605-estimate.jpg"; type = "image/jpeg";
     }
     const file = new File([blob], name, { type });
     const url = URL.createObjectURL(blob);
-    if(isPhone && navigator.share){
-      menu.innerHTML = `<button class="btn btn-primary" id="shareNow">Share ${mode.toUpperCase()}</button><a class="btn btn-secondary" href="${url}" download="${name}">Save</a>`;
-      document.getElementById("shareNow").onclick = async () => {
-        try { await navigator.share({ files: [file], title: "605 Estimate" }); }
-        catch(e){ if(!e || e.name !== "AbortError") window.open(url); }
-      };
-    } else {
+    if(mode === "save"){
       const a = document.createElement("a");
       a.href = url; a.download = name; a.click();
-      menu.classList.add("hidden");
-      menu.innerHTML = '<button class="btn btn-secondary" onclick="shareSheet(\'pdf\')">Share PDF</button><button class="btn btn-secondary" onclick="shareSheet(\'jpg\')">JPG</button><button class="btn btn-secondary" onclick="shareSheet(\'print\')">Print</button>';
+      resetShareMenu();
+      return;
     }
+    const label = mode === "text" ? "Open Messages" : mode === "email" ? "Open Mail" : "Share image";
+    menu.innerHTML = `<button class="btn btn-primary" id="shareNow">${label}</button><button class="btn btn-secondary" onclick="resetShareMenu()">Cancel</button>`;
+    document.getElementById("shareNow").onclick = async () => {
+      try {
+        if(navigator.share) await navigator.share({ files: [file], title: "605 Estimate", text: "605 closing estimate" });
+        else window.open(url);
+      } catch(e) {
+        if(!e || e.name !== "AbortError") window.open(url);
+      }
+    };
   } catch(e) {
-    menu.innerHTML = '<button class="btn btn-secondary" onclick="toggleShare()">Could not build file. ' + (e && e.message ? e.message : "Try again.") + '</button>';
+    menu.innerHTML = '<button class="btn btn-secondary" onclick="resetShareMenu()">Could not build file. ' + (e && e.message ? e.message : "Try again.") + '</button>';
   }
+}
+function resetShareMenu(){
+  const menu = document.getElementById("shareMenu");
+  menu.classList.add("hidden");
+  menu.innerHTML = '<button class="btn btn-secondary" onclick="shareSheet(\'text\')">Text PDF</button><button class="btn btn-secondary" onclick="shareSheet(\'image\')">Share image</button><button class="btn btn-secondary" onclick="shareSheet(\'save\')">Save image</button><button class="btn btn-secondary" onclick="shareSheet(\'email\')">Email</button><button class="btn btn-secondary" onclick="shareSheet(\'print\')">Print</button>';
 }
 document.querySelectorAll(".brand-logo").forEach(img => { img.src = LOGO; });
 </script>
