@@ -288,8 +288,8 @@ const DEFAULTS = {
   agent: "",
   agentPhone: "",
   agentEmail: "",
-  listPct: 2.5,
-  buyPct: 2.5,
+  listPct: 3,
+  buyPct: 3,
   salesTax: 6.2,
   admin: 299,
   search: 164.61,
@@ -314,7 +314,8 @@ state.settings = {...DEFAULTS, ...state.settings};
 state.settings.brokerage = "605 Real Estate";
 state.settings.phone = "(605) 759-4294";
 state.settings.address = "3500 W 59th St";
-state.settings.city = "Sioux Falls, SD 57108";
+state.settings.listPct = state.settings.listPct === 2.5 ? 3 : state.settings.listPct;
+state.settings.buyPct = state.settings.buyPct === 2.5 ? 3 : state.settings.buyPct;
 
 // TRN HOP owner's policy — calibrated to portal quotes (Minnehaha/Lincoln, Oct 2026)
 // $100k = $440; +$2.20 per $1,000 above $100k (verified $200k/$300k/$400k/$570k)
@@ -370,13 +371,13 @@ function sellerNet(d){
   const extras = (d.extras || []).filter(x => x.who === "seller" || x.who === "split");
   const extraSeller = extras.reduce((a, x) => a + num(x.amount) * (x.who === "split" ? 0.5 : 1), 0);
   const sellerCredit = d.sfMode === "pct" ? Math.round(price * num(d.sellerFinancingPct) / 100) : num(d.sellerFinancing);
-  const surveyCost = d.surveyType === "staked" ? 650 : (d.surveyType === "none" ? 0 : 200);
+  const surveyCost = d.surveyOn ? (d.surveyType === "staked" ? 650 : 200) : 0;
   const surveySeller = Math.round(surveyCost * num(d.surveySellerPct == null ? 0 : d.surveySellerPct) / 100);
-  const floodCost = d.flood ? 20 : 0;
+  const floodCost = d.floodOn ? 20 : 0;
   const floodSeller = Math.round(floodCost * num(d.floodSellerPct == null ? 0 : d.floodSellerPct) / 100);
-  const warrantyCost = num(d.warranty);
+  const warrantyCost = d.warrantyOn ? num(d.warranty) : 0;
   const warrantySeller = Math.round(warrantyCost * num(d.warrantySellerPct == null ? 0 : d.warrantySellerPct) / 100);
-  const assessments = num(d.assessments);
+  const assessments = d.assessOn ? num(d.assessments) : 0;
   const hoa = d.hoaOn ? hoaProration(num(d.hoaMonthly), d.closeDate).seller : 0;
   const propane = d.propaneOn ? num(d.propane) : 0;
   const costs = list+buy+listTax+buyTax+title+closeShare+num(d.admin)+transfer+tax+num(d.payoff)+sellerCredit+surveySeller+floodSeller+warrantySeller+assessments+hoa+propane+num(d.other)+extraSeller;
@@ -825,7 +826,6 @@ function renderDeal(){
     <fieldset><legend>Taxes & prorations</legend>
       <div class="two">
         <div class="field"><label>Annual taxes</label><input type="number" value="${d.annualTax}" onchange="patchDeal('${d.id}','annualTax',this.value)"></div>
-        <div class="field"><label>Assessments (seller)</label><input type="number" value="${d.assessments||0}" onchange="patchDeal('${d.id}','assessments',this.value)"></div>
       </div>
     </fieldset>` : `
     <fieldset><legend>Purchase</legend>
@@ -897,7 +897,43 @@ function renderDeal(){
       <div class="line"><span>Recording</span><span>${money(s.record)}</span></div>
     </fieldset>`;
 
-  const fieldsWithExtras = fields + `
+  const contractItems = d.party === "seller" ? `
+    <fieldset><legend>Contract items</legend>
+      <div class="two">
+        <div class="field"><label>Survey</label>
+          <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.surveyOn?"checked":""} onchange="patchDeal('${d.id}','surveyOn',this.checked)"> Include survey</label>
+        </div>
+        ${d.surveyOn ? `
+          <div class="field"><label>Survey type</label>
+            <select onchange="patchDeal('${d.id}','surveyType',this.value)">
+              ${[["mortgage","Mortgage inspection ($200)"],["staked","Staked ($650)"]].map(([v,l])=>`<option value="${v}" ${(d.surveyType||"mortgage")===v?"selected":""}>${l}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field"><label>Survey seller %</label><input type="number" value="${d.surveySellerPct==null?0:d.surveySellerPct}" onchange="patchDeal('${d.id}','surveySellerPct',this.value)"></div>` : ""}
+        <div class="field"><label>Flood cert</label>
+          <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.floodOn?"checked":""} onchange="patchDeal('${d.id}','floodOn',this.checked)"> Include flood cert ($20)</label>
+        </div>
+        ${d.floodOn ? `<div class="field"><label>Flood cert seller %</label><input type="number" value="${d.floodSellerPct==null?0:d.floodSellerPct}" onchange="patchDeal('${d.id}','floodSellerPct',this.value)"></div>` : ""}
+        <div class="field"><label>Home warranty</label>
+          <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.warrantyOn?"checked":""} onchange="patchDeal('${d.id}','warrantyOn',this.checked)"> Include home warranty</label>
+        </div>
+        ${d.warrantyOn ? `
+          <div class="field"><label>Home warranty</label><input type="number" value="${d.warranty||0}" onchange="patchDeal('${d.id}','warranty',this.value)"></div>
+          <div class="field"><label>Warranty seller %</label><input type="number" value="${d.warrantySellerPct==null?0:d.warrantySellerPct}" onchange="patchDeal('${d.id}','warrantySellerPct',this.value)"></div>` : ""}
+        <div class="field"><label>Assessments</label>
+          <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.assessOn?"checked":""} onchange="patchDeal('${d.id}','assessOn',this.checked)"> Include assessments</label>
+        </div>
+        ${d.assessOn ? `<div class="field"><label>Assessments amount</label><input type="number" value="${d.assessments||0}" onchange="patchDeal('${d.id}','assessments',this.value)"></div>` : ""}
+        <div class="field"><label>HOA</label>
+          <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.hoaOn?"checked":""} onchange="patchDeal('${d.id}','hoaOn',this.checked)"> Prorate monthly HOA</label>
+        </div>
+        ${d.hoaOn ? `<div class="field"><label>Monthly HOA</label><input type="number" value="${d.hoaMonthly||0}" onchange="patchDeal('${d.id}','hoaMonthly',this.value)"><div class="muted">Seller ${money(hoaProration(num(d.hoaMonthly), d.closeDate).seller)} · Buyer ${money(hoaProration(num(d.hoaMonthly), d.closeDate).buyer)}</div></div>` : ""}
+        <div class="field"><label>Fuel / propane</label>
+          <label style="display:flex;align-items:center;gap:8px;height:44px"><input type="checkbox" style="width:auto;height:auto" ${d.propaneOn?"checked":""} onchange="patchDeal('${d.id}','propaneOn',this.checked)"> Prorate fuel / propane</label>
+        </div>
+        ${d.propaneOn ? `<div class="field"><label>Fuel / propane amount</label><input type="number" value="${d.propane||0}" onchange="patchDeal('${d.id}','propane',this.value)"></div>` : ""}
+      </div>
+    </fieldset>` : `
     <fieldset><legend>Contract items</legend>
       <div class="two">
         <div class="field"><label>Survey</label>
@@ -919,7 +955,9 @@ function renderDeal(){
         <div class="field"><label>Home warranty</label><input type="number" value="${d.warranty||0}" onchange="patchDeal('${d.id}','warranty',this.value)"></div>
         <div class="field"><label>Warranty seller %</label><input type="number" value="${d.warrantySellerPct==null?0:d.warrantySellerPct}" onchange="patchDeal('${d.id}','warrantySellerPct',this.value)"></div>
       </div>
-    </fieldset>` + extraRows(d);
+    </fieldset>`;
+
+  const fieldsWithExtras = fields + contractItems + extraRows(d);
 
   const statement = d.party==="seller" ? (() => {
     const closing = s.list + s.buy + s.listTax + s.buyTax + num(d.admin) + s.title + s.closeShare + s.transfer + num(d.other) + s.sellerCredit + s.surveySeller + s.floodSeller + s.warrantySeller + num(d.assessments) + (d.hoaOn ? hoaProration(num(d.hoaMonthly), d.closeDate).seller : 0) + (d.propaneOn ? num(d.propane) : 0) + s.extraSeller;
@@ -963,10 +1001,10 @@ function renderDeal(){
         <div class="line"><span>Commission Sales Tax:</span><span>${money(s.listTax + s.buyTax)}</span></div>
         <div class="line"><span>Realtor Admin Fee:</span><span>${money(d.admin)}</span></div>
         <div class="line"><span>Seller concessions:</span><span>${money(s.sellerCredit)}</span></div>
-        <div class="line"><span>Survey:</span><span>${money(s.surveySeller)}</span></div>
-        <div class="line"><span>Flood cert:</span><span>${money(s.floodSeller)}</span></div>
-        <div class="line"><span>Home warranty:</span><span>${money(s.warrantySeller)}</span></div>
-        <div class="line"><span>Assessments:</span><span>${money(d.assessments)}</span></div>
+        ${d.surveyOn ? `<div class="line"><span>Survey:</span><span>${money(s.surveySeller)}</span></div>` : ""}
+        ${d.floodOn ? `<div class="line"><span>Flood cert:</span><span>${money(s.floodSeller)}</span></div>` : ""}
+        ${d.warrantyOn ? `<div class="line"><span>Home warranty:</span><span>${money(s.warrantySeller)}</span></div>` : ""}
+        ${d.assessOn ? `<div class="line"><span>Assessments:</span><span>${money(num(d.assessments))}</span></div>` : ""}
         ${d.hoaOn ? `<div class="line"><span>HOA:</span><span>${money(hoaProration(num(d.hoaMonthly), d.closeDate).seller)}</span></div>` : ""}
         ${d.propaneOn ? `<div class="line"><span>Fuel / propane:</span><span>${money(num(d.propane))}</span></div>` : ""}
         <div class="line"><span>Closing / Possession (${d.closeSellerPct==null?50:d.closeSellerPct}%):</span><span>${money(s.closeShare)}</span></div>
