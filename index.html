@@ -1277,8 +1277,21 @@ async function loadScript(src, flag){
 async function letterImage(){
   const sheet = document.getElementById("statement-sheet");
   await loadScript("https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.11/dist/html2canvas-pro.min.js", "html2canvas");
-  const shot = await html2canvas(sheet, { scale: 1.5, backgroundColor: "#ffffff", useCORS: true, logging: false });
-  const pageW = 816, pageH = 1056, margin = 32;
+  const stage = document.createElement("div");
+  stage.style.cssText = "position:fixed;left:0;top:0;width:820px;background:#fff;z-index:9999;padding:24px 28px";
+  const clone = sheet.cloneNode(true);
+  clone.style.width = "760px";
+  clone.style.boxShadow = "none";
+  clone.style.padding = "0";
+  stage.appendChild(clone);
+  document.body.appendChild(stage);
+  stage.querySelectorAll(".ns-sum").forEach(el => { el.style.display = "grid"; el.style.gridTemplateColumns = "1fr 180px"; });
+  stage.querySelectorAll(".ns-cols").forEach(el => { el.style.display = "grid"; el.style.gridTemplateColumns = "1fr 1fr"; el.style.gap = "24px"; });
+  stage.querySelectorAll(".line").forEach(el => { el.style.fontSize = "12px"; el.style.padding = "3px 0"; el.style.whiteSpace = "nowrap"; });
+  await new Promise(r => setTimeout(r, 50));
+  const shot = await html2canvas(stage, { scale: 2, backgroundColor: "#ffffff", useCORS: true, logging: false, width: 820, windowWidth: 820 });
+  document.body.removeChild(stage);
+  const pageW = 1275, pageH = 1650, margin = 40;
   const page = document.createElement("canvas");
   page.width = pageW; page.height = pageH;
   const ctx = page.getContext("2d");
