@@ -257,6 +257,7 @@
       <button class="tile tile-sheet" onclick="newDeal('buyer')"><span style="color:var(--red)">+</span><div><h2>New buyer estimate</h2><p>Cash to close, loan, and title</p></div></button>
       <button class="tile tile-ink" onclick="newCompare()"><span>+</span><div><h2>New offer comparison</h2><p>Line up multiple offers on one listing</p></div></button>
       <button class="tile tile-sheet" onclick="openTitle()"><span style="color:var(--red)">$</span><div><h2>Title quote</h2><p>TRN rates by county and price</p></div></button>
+      <button class="tile tile-red" onclick="openPay()"><span>+</span><div><h2>Payment calculator</h2><p>Monthly PITI from price, rate, and term</p></div></button>
     </div>
     <h2 class="section-title">Saved sheets</h2>
     <div class="no-print" style="display:flex;gap:8px;margin-bottom:8px">
@@ -545,6 +546,12 @@ function newCompare(){
   activeCmp = c.id; view="cmp"; render();
 }
 function openTitle(){ view="title"; if(!state.title) state.title = { county:"minnehaha", price:300000, loan:240000, kind:"purchase" }; save(state); render(); }
+function openPay(){
+  view="pay";
+  if(!state.pay) state.pay = { price:300000, downMode:"pct", downPct:20, downAmount:60000, rate:6.75, term:30, annualTax:3600, annualIns:1800, pmi:0, loanType:"conventional" };
+  save(state); render();
+}
+function patchPay(f, v){ state.pay[f]=v; save(state); render(); }
 function toggleSettings(){
   const body = document.getElementById("defaultsBody");
   const bar = document.getElementById("defaultsBar");
@@ -1253,10 +1260,128 @@ function renderTitle(){
     </aside>`;
 }
 
+function renderPay(){
+  const p = state.pay || {};
+  const price = num(p.price);
+  const type = p.loanType || "conventional";
+  const cash = type === "cash";
+  const mode = p.downMode || "pct";
+  let down, loan;
+  if(cash){ down = price; loan = 0; }
+  else if(mode === "dollar"){ down = Math.min(price, Math.max(0, num(p.downAmount))); loan = price - down; }
+  else { const pct = Math.min(100, Math.max(0, num(p.downPct == null ? 20 : p.downPct))); down = Math.round(price * pct / 100); loan = price - down; }
+  const downPct = price ? down / price * 100 : 0;
+  let programFee = 0, programLabel = "";
+  if(type === "fha" && loan > 0){ programFee = Math.round(loan * 0.0175); programLabel = "FHA upfront MIP (1.75%, financed)"; }
+  else if(type === "va" && loan > 0){
+    const vaPct = downPct >= 10 ? 1.25 : downPct >= 5 ? 1.5 : 2.15;
+    programFee = Math.round(loan * vaPct / 100);
+    programLabel = `VA funding fee (${vaPct}%, first use, financed)`;
+  }
+  const loanWithFee = loan + programFee;
+  const rate = p.rate == null ? 6.75 : num(p.rate);
+  const term = p.term == null ? 30 : num(p.term);
+  const pi = loanWithFee > 0 ? monthlyPI(loanWithFee, rate, term) : 0;
+  const taxMo = num(p.annualTax) / 12;
+  const insMo = num(p.annualIns == null ? 1800 : p.annualIns) / 12;
+  const pmi = cash ? 0 : (type === "fha" && !num(p.pmi) ? Math.round(loan * 0.0055 / 12) : num(p.pmi));
+  const piti = pi + taxMo + insMo + pmi;
+  const months = Math.round(term * 12);
+  const totalPaid = pi * months;
+  const totalInterest = Math.max(0, totalPaid - loanWithFee);
+  const set = state.settings;
+  editorView.innerHTML = `
+    <div class="no-print">
+      <div class="kicker">Payment calculator</div>
+      <h2 class="headline" style="font-size:24px;margin:4px 0 16px">Monthly payment</h2>
+      <div class="two">
+        <div class="field"><label>Purchase price</label><input type="number" value="${p.price}" onchange="patchPay('price',num(this.value))"></div>
+        <div class="field"><label>Loan type</label>
+          <select onchange="patchPay('loanType',this.value)">
+            ${[["conventional","Conventional"],["fha","FHA"],["va","VA"],["cash","Cash"]].map(([v,l])=>`<option value="${v}" ${type===v?"selected":""}>${l}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>Down payment</label>
+          <div style="display:flex;gap:8px">
+            <select style="width:84px;flex:0 0 84px" onchange="patchPay('downMode',this.value)" ${cash?"disabled":""}>
+              <option value="pct" ${mode!=="dollar"?"selected":""}>%</option>
+              <option value="dollar" ${mode==="dollar"?"selected":""}>$</option>
+            </select>
+            ${mode==="dollar"
+              ? `<input type="number" value="${p.downAmount==null?60000:p.downAmount}" ${cash?"disabled":""} onchange="patchPay('downAmount',num(this.value))">`
+              : `<input type="number" step="0.5" value="${p.downPct==null?20:p.downPct}" ${cash?"disabled":""} onchange="patchPay('downPct',num(this.value))">`}
+          </div>
+          <div class="muted" style="margin-top:4px">Down ${money(down)} · Loan ${money(loan)}${programFee?` + ${money(programFee)} financed`:""}</div>
+        </div>
+        ${cash?"":`
+        <div class="field"><label>Interest rate %</label><input type="number" step="0.125" value="${rate}" onchange="patchPay('rate',num(this.value))"></div>
+        <div class="field"><label>Term (years)</label><input type="number" value="${term}" onchange="patchPay('term',num(this.value))"></div>
+        <div class="field"><label>Annual property taxes</label><input type="number" value="${p.annualTax}" onchange="patchPay('annualTax',num(this.value))"></div>
+        <div class="field"><label>Annual homeowners insurance</label><input type="number" value="${p.annualIns==null?1800:p.annualIns}" onchange="patchPay('annualIns',num(this.value))"></div>
+        <div class="field"><label>${type==="fha"?"Monthly MIP":"Monthly PMI (0 if none)"}</label><input type="number" step="0.01" value="${p.pmi==null?0:p.pmi}" onchange="patchPay('pmi',num(this.value))"></div>`}
+      </div>
+      ${programFee?`<p class="muted" style="margin:8px 0 0">${programLabel}: ${money(programFee)}. Added to the loan.</p>`:""}
+    </div>
+    <aside>
+      <div class="no-print share-bar">
+        <button class="btn btn-primary" onclick="toggleShare()">Share / Print</button>
+        <div id="shareMenu" class="share-menu hidden">
+          <button class="btn btn-secondary" onclick="shareSheet('pdf')">PDF</button>
+          <button class="btn btn-secondary" onclick="shareSheet('image')">Image</button>
+          <button class="btn btn-secondary" onclick="window.print()">Print</button>
+        </div>
+      </div>
+      <div class="sheet" id="statement-sheet">
+        <div class="ns-top">
+          <div>
+            <img class="ns-logo" src="${LOGO}" alt="605 Real Estate">
+            <div class="ns-title" style="margin-top:8px">PAYMENT</div>
+          </div>
+          <div class="ns-addr">${money(price)}<br>${({conventional:"Conventional",fha:"FHA",va:"VA",cash:"Cash"})[type]}</div>
+        </div>
+        <div class="ns-banner">MONTHLY PAYMENT<br>${type.toUpperCase()}</div>
+        <div class="ns-sum">
+          <div>
+            <div class="line"><span>Purchase price:</span><span>${money(price)}</span></div>
+            <div class="line"><span>Down payment:</span><span>${money(down)}</span></div>
+            ${cash?`<div class="line"><span>Cash purchase</span><span>${money(price)}</span></div>`:`<div class="line"><span>${term}-year loan at ${rate}%:</span><span>${money(loanWithFee)}</span></div>`}
+            ${programFee?`<div class="line"><span>${programLabel}:</span><span>${money(programFee)}</span></div>`:""}
+          </div>
+          ${cash?"":donutChart([
+            { label: "Principal & interest", value: pi, color: "#b71538" },
+            { label: "Property tax", value: taxMo, color: "#2a2a2a" },
+            { label: "Homeowners insurance", value: insMo, color: "#8a8a8a" },
+            { label: type==="fha"?"MIP":"PMI", value: pmi, color: "#c9a227" }
+          ], "Monthly", money(piti))}
+        </div>
+        ${cash?`<div class="ns-net">CASH PURCHASE<span class="big">${money(price)}</span></div>`:`<div class="ns-net">MONTHLY PAYMENT<span class="big">${money(piti)}</span></div>`}
+        ${cash?"":`
+        <div class="ns-banner">WHAT'S IN THE PAYMENT</div>
+        <div class="ns-cols">
+          <div>
+            <div class="line"><span>Principal & interest:</span><span>${money(pi)}</span></div>
+            <div class="line"><span>Property tax:</span><span>${money(taxMo)}</span></div>
+          </div>
+          <div>
+            <div class="line"><span>Homeowners insurance:</span><span>${money(insMo)}</span></div>
+            <div class="line"><span>${type==="fha"?"MIP":"PMI"}:</span><span>${money(pmi)}</span></div>
+          </div>
+        </div>
+        <div class="muted" style="margin-top:8px">Over ${term} years: ${money(totalPaid)} paid · ${money(totalInterest)} interest</div>`}
+        <p class="footer note">Estimate only, not a loan quote. Final payment comes from the lender. Prepared by ${set.brokerage}.</p>
+        <div class="ns-foot">
+          <div><div class="who">${set.agent || set.brokerage}</div><div>${set.brokerage}</div><div>${set.agentPhone || set.phone}</div><div>${set.agentEmail || "www.realestate605.com"}</div></div>
+          <div style="text-align:right">${set.address}<br>${set.city}</div>
+        </div>
+      </div>
+    </aside>`;
+}
+
 function renderEditor(){
   if(view==="deal") renderDeal();
   else if(view==="cmp") renderCmp();
   else if(view==="title") renderTitle();
+  else if(view==="pay") renderPay();
 }
 
 function render(){
@@ -1264,7 +1389,7 @@ function render(){
   homeView.classList.toggle("hidden", !home);
   editorView.classList.toggle("hidden", home);
   backBtn.classList.toggle("hidden", home);
-  printBtn.classList.toggle("hidden", view !== "deal");
+  printBtn.classList.toggle("hidden", view !== "deal" && view !== "pay");
   if(home) renderHome(); else renderEditor();
   document.querySelectorAll(".brand-logo").forEach(img => { img.src = LOGO; });
 }
